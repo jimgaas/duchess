@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html>
+    <head>
+
+        <title>Takeoff Distance Duchess N6638H</title>
+        <style>
+            body {
+                background-color: #F0F0F0;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                height: 100vh;
+                margin: 0;
+                padding: 0;
+                box-sizing: border-box;
+                font-family: Arial, sans-serif;
+            }
+
+            .input-container {
+                margin: 10px;
+            }
+
+            .input-container label {
+                display: block;
+                margin-bottom: 5px;
+            }
+
+            .input-container input {
+                width: 100px;
+                padding: 5px 10px;
+                box-sizing: border-box;
+                border: 1px solid #777;
+                border-radius: 5px;
+                text-align: center;
+            }
+    
+  
+            .button {
+                background-color: #007AFF;
+                color: white;
+                border: none;
+                border-radius: 5px;
+                padding: 10px 30px;
+                margin-top: 20px;
+                cursor: pointer;
+            }
+
+            .button:hover {
+                background-color: #005cbf;
+            }
+
+            .result-text {
+                font-size: 18px;
+                text-align: center;
+                margin-bottom: 10px;
+            }
+        </style>    
+    
+    </head>
+
+
+    <body>
+        
+       <h1>Takeoff Distance Calculator  Beech Duchess N6638H</h1>
+        <div class="input-container">
+            <label for="densityAltitude">Density Altitude:</label>
+            <input id="densityAltitude" type="number">
+
+            <label for="grossWeight">Gross Takeoff Weight:</label>
+            <input id="grossWeight" type="number">
+
+            <label for="headwindComponent">Headwind Component:</label>
+            <input id="headwindComponent" type="number">
+
+            <label for="obstacle">50 Foot Obstacle:</label>
+            <input id="obstacle" type="checkbox">
+        </div>
+
+        <button class="button" onclick="onCalculate()">Calculate</button>
+       <div id="result" class="result-text"></div>
+
+
+    <script>
+
+/* // Assuming you have input elements with IDs "inputField1" and "inputField2"
+var inputField1 = document.getElementById("inputField1");
+var inputField2 = document.getElementById("inputField2");
+
+// Log the values to the console
+console.log("Input Field 1 Value:", inputField1.value);
+console.log("Input Field 2 Value:", inputField2.value);
+*/
+        
+ const baseTODist = {
+      0: {toDist: 1000},
+   1000: {toDist: 1100},
+   2000: {toDist: 1200},
+   3000: {toDist: 1350},
+   4000: {toDist: 1500},
+   5000: {toDist: 1650},
+   6000: {toDist: 1800},
+   7000: {toDist: 2000},
+   8000: {toDist: 2200},
+   9000: {toDist: 2400},
+  10000: {toDist: 2600},
+  11000: {toDist: 2800},
+  12000: {toDist: 3000},
+  13000: {toDist: 3300},
+  14000: {toDist: 3600},
+}; 
+
+
+
+const slopesByAltitude = {
+     0:  {weightSlope: -0.4285714, headwindSlope: -13.,  tailwindSlope: 35 },
+  1000:  {weightSlope: -0.4285714, headwindSlope: -13.,  tailwindSlope: 35 },
+  2000:  {weightSlope: -0.4285714, headwindSlope: -13.,  tailwindSlope: 35 },
+  3000:  {weightSlope: -0.5000050, headwindSlope: -14.5, tailwindSlope: 40 },
+  4000:  {weightSlope: -0.5714286, headwindSlope: -16.,  tailwindSlope: 40 },
+  5000:  {weightSlope: -0.6785715, headwindSlope: -16.,  tailwindSlope: 40 },
+  6000:  {weightSlope: -0.7857143, headwindSlope: -16.,  tailwindSlope: 55 },
+  7000:  {weightSlope: -0.8571429, headwindSlope: -18.,  tailwindSlope: 55 },
+  8000:  {weightSlope: -0.9285714, headwindSlope: -20.,  tailwindSlope: 60 },
+  9000:  {weightSlope: -0.9642857, headwindSlope: -21.6, tailwindSlope: 60 },
+ 10000:  {weightSlope: -1.0000000, headwindSlope: -23.3, tailwindSlope: 65 },
+ 11000:  {weightSlope: -1.1428572, headwindSlope: -26.5, tailwindSlope: 65 },
+ 12000:  {weightSlope: -1.2857143, headwindSlope: -30. , tailwindSlope: 85 },
+};
+
+const obstacle = {
+   0: {addDist: 1100},
+1000: {addDist: 1300},
+2000: {addDist: 1500},
+3000: {addDist: 2000},
+4000: {addDist: 2500},
+5000: {addDist: 3000},
+6000: {addDist: 3500},
+};  
+
+/*
+            // Check if density altitude is above 6000 feet
+            if (densityAltitude > 6000) {
+                document.getElementById("result").textContent =
+                    "Takeoff over an obstacle at density altitudes over 6000 feet is not possible.";
+                return;
+            }
+*/
+
+// Function to interpolate between two values
+function interpolate(value1, value2, factor) {
+    return value1 + (value2 - value1) * factor;
+}
+
+// Function to find the nearest known points for interpolation
+function findBracketingPoints(data, target) {
+    let lowerKey = null;
+    let upperKey = null;
+
+    for (let key of Object.keys(data).map(Number).sort((a, b) => a - b)) {
+        if (key <= target) {
+            lowerKey = key;
+        }
+        if (key >= target && upperKey === null) {
+            upperKey = key;
+        }
+        if (lowerKey !== null && upperKey !== null) {
+            break;
+        }
+    }
+
+    return { lowerKey, upperKey };
+}
+
+function calculateTakeoffDistance(densityAltitude, grossWeight, headwindComponent, obstacleCheckbox) {
+    // Validate inputs
+    if (isNaN(densityAltitude) || isNaN(grossWeight) || isNaN(headwindComponent)) {
+        console.error("Invalid input: Ensure all inputs are numbers.");
+        return NaN; // or return a default value
+    }
+
+    // Check and get base takeoff distance
+    let baseDistData = baseTODist[densityAltitude];
+    let baseDistance = baseDistData ? baseDistData.toDist : 0;
+
+    // Get slopes and adjust for weight and wind
+    let slopeData = slopesByAltitude[densityAltitude];
+    if (slopeData) {
+        let weightAdjustment = (3900 - grossWeight) * (slopeData.weightSlope || 0);
+        let windAdjustment = headwindComponent * (headwindComponent >= 0 ? slopeData.headwindSlope : slopeData.tailwindSlope || 0);
+        baseDistance -= weightAdjustment;
+        baseDistance += windAdjustment;
+    } else {
+        console.error("No slope data found for density altitude:", densityAltitude);
+    }
+
+    // Adjust for obstacle
+    if (obstacleCheckbox) {
+        let obstacleData = obstacle[densityAltitude] || { addDist: 0 };
+        baseDistance += obstacleData.addDist;
+    }
+
+    return baseDistance;
+}
+
+
+
+
+// Function to handle the calculate button click
+function onCalculate() {
+    const densityAltitude = parseFloat(document.getElementById('densityAltitude').value);
+    const grossWeight = parseFloat(document.getElementById('grossWeight').value);
+    const headwindComponent = parseFloat(document.getElementById('headwindComponent').value);
+    const obstacleCheckbox = document.getElementById('obstacle').checked;
+
+    const takeoffDistance = calculateTakeoffDistance(
+        densityAltitude, 
+        grossWeight, 
+        headwindComponent, 
+        obstacleCheckbox
+    );
+
+    document.getElementById('result').innerText = `Estimated Takeoff Distance: ${takeoffDistance.toFixed(2)} feet`;
+
+}
+        </script>
+
+
+
+
+    </body>
+</html>
